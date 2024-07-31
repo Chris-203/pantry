@@ -1,0 +1,39 @@
+{
+  "name": "my-pantry",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@fortawesome/fontawesome-svg-core": "^6.6.0",
+    "@fortawesome/free-solid-svg-icons": "^6.6.0",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@mui/material": "^5.16.5",
+    "@zxing/library": "^0.21.2",
+    "firebase": "^10.12.4",
+    "jsbarcode": "^3.11.6",
+    "next": "^14.2.5",
+    "prop-types": "^15.8.1",
+    "quagga": "^0.6.16",
+    "react": "^18.2.0",
+    "react-camera-pro": "^1.4.0",
+    "react-dom": "^18.2.0",
+    "react-webcam": "^7.2.0",
+    "rm": "^0.1.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.14.6",
+    "@eslint/js": "^9.8.0",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.5",
+    "eslint-plugin-react": "^7.35.0",
+    "globals": "^15.8.0"
+  }
+}
