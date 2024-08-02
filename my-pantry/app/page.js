@@ -10,6 +10,9 @@ import {
   TextField,
   Switch,
   FormControlLabel,
+  IconButton,
+  AppBar,
+  Toolbar,
 } from "@mui/material";
 import { firestore } from "@/firebase";
 import {
@@ -22,10 +25,25 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { useEffect, useState, useMemo, createContext } from "react";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { amber, deepOrange, grey } from "@mui/material/colors";
+import { ThemeProvider, createTheme, styled } from "@mui/material/styles";
+import { blue, grey } from "@mui/material/colors";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPlus,
+  faStar as faStarSolid,
+  faStar as faStarOutline,
+} from "@fortawesome/free-solid-svg-icons";
+import { SnackbarProvider, useSnackbar } from "notistack";
+import MenuIcon from "@mui/icons-material/Menu";
+import SearchIcon from "@mui/icons-material/Search";
+import MoreIcon from "@mui/icons-material/MoreVert";
+import { useRouter } from "next/navigation";
+import { getAuth, signOut } from "firebase/auth";
+import firebaseConfig from "@/firebaseConfig";
+import { initializeApp } from "firebase/app";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 const getDesignTokens = (mode) => ({
   palette: {
@@ -33,34 +51,36 @@ const getDesignTokens = (mode) => ({
     ...(mode === "light"
       ? {
           primary: {
-            main: "#8ed4f4",
+            main: "#2871a3", //Toolbar color
           },
-          divider: amber[200],
+          divider: blue,
           background: {
-            default: "#ac9d9d",
-            paper: "#ffffff",
+            default: "#ffffff", //Background color
+            paper: "#2871a3", //Item background color
+            
+            
           },
           text: {
-            primary: grey[900],
+            primary: "#ffffff",
             secondary: grey[800],
-            tertiary: "#2871a3", // Add button color
-            quaternary: "#ffffff", // Add button text color
+            tertiary: "#b71c1c",
+            quaternary: "#1b5e20", //Modal background color
           },
         }
       : {
           primary: {
-            main: "#800000", // Maroon color
+            main: "#800000", //Toolbar color
           },
-          divider: deepOrange[700],
+          divider: blue,
           background: {
-            default: "grey.800",
-            paper: "grey",
+            default: "Darkgrey", //Background color
+            paper: "#800000", //Item background color
           },
           text: {
-            primary: "#ffffff", // Item text color
-            secondary: "#ffffff", // Modal text color
-            tertiary: "#2871a3", // Add button color
-            quaternary: "#ffffff", // Add button text color
+            primary: grey[900],
+            secondary: "#ffffff",
+            tertiary: "#2871a3",
+            quaternary: "#1b5e20", //Modal background color
           },
         }),
   },
@@ -72,7 +92,7 @@ const style = {
   left: "50%",
   transform: "translate(-50%, -50%)",
   width: 400,
-  bgcolor: "background.paper",
+  bgcolor: "text.quaternary",
   boxShadow: 24,
   p: 4,
   display: "flex",
@@ -80,11 +100,10 @@ const style = {
   gap: 3,
 };
 
-// Define the ColorModeContext
 const ColorModeContext = createContext({ toggleColorMode: () => {} });
 
-export default function Home() {
-  const [mode, setMode] = useState("dark");
+function Home() {
+  const [mode, setMode] = useState("light");
   const colorMode = useMemo(
     () => ({
       toggleColorMode: () => {
@@ -93,11 +112,12 @@ export default function Home() {
     }),
     []
   );
-
+  const router = useRouter();
   const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
   const [pantry, setPantry] = useState([]);
   const [filteredPantry, setFilteredPantry] = useState([]);
   const [filter, setFilter] = useState("");
+  const [user, setUser] = useState(null);
 
   const [open, setOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -110,15 +130,25 @@ export default function Home() {
 
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [removeQuantity, setRemoveQuantity] = useState(1);
 
-  const updatePantry = async () => {
-    const snapshot = query(collection(firestore, "pantry"));
+  const updatePantry = async (userId) => {
+    if (!userId) return;
+
+    const userPantryRef = collection(firestore, `users/${userId}/pantry`);
+    const snapshot = query(userPantryRef);
     const docs = await getDocs(snapshot);
     const pantryList = [];
     docs.forEach((doc) => {
       pantryList.push({ name: doc.id, ...doc.data() });
     });
+
+    // Sort pantryList by favorite status first, then by name
+    pantryList.sort((a, b) => {
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
     setPantry(pantryList);
     setFilteredPantry(pantryList);
   };
@@ -128,16 +158,50 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setFilteredPantry(
-      pantry.filter((item) =>
-        item.name.toLowerCase().includes(filter.toLowerCase())
-      )
-    );
+    const lowercasedFilter = filter.toLowerCase();
+    const filtered = pantry
+      .filter((item) => {
+        // If the filter is "favorites", only show favorite items
+        if (lowercasedFilter === "favorites") {
+          return item.favorite;
+        }
+        // Otherwise, filter by item name
+        return item.name.toLowerCase().includes(lowercasedFilter);
+      })
+      .sort((a, b) => {
+        // Sort by favorite status first (favorites first)
+        if (a.favorite === b.favorite) {
+          // If favorite status is the same, sort by name
+          return a.name.localeCompare(b.name);
+        }
+        return b.favorite - a.favorite; // Favorites come first
+      });
+
+    setFilteredPantry(filtered);
   }, [filter, pantry]);
 
-  const addItem = async (item, qty) => {
+  // Updated useEffect to fetch pantry for the current user
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setUser(user);
+        updatePantry(user.uid); // Fetch pantry items for the current user
+      } else {
+        router.push("/auth");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const { enqueueSnackbar } = useSnackbar();
+
+  const addItem = async (userId, item, qty) => {
+    if (!userId) return;
+
     const itemLower = item.toLowerCase();
-    const docRef = doc(collection(firestore, "pantry"), itemLower);
+    const userPantryRef = collection(firestore, `users/${userId}/pantry`);
+    const docRef = doc(userPantryRef, itemLower);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const { count } = docSnap.data();
@@ -145,12 +209,18 @@ export default function Home() {
     } else {
       await setDoc(docRef, { count: qty });
     }
-    await updatePantry();
+    await updatePantry(userId);
+    enqueueSnackbar(`Success! Added ${item} x${qty} to the pantry`, {
+      variant: "success",
+    });
   };
 
-  const removeItem = async (item, qty) => {
+  const removeItem = async (userId, item, qty) => {
+    if (!userId) return;
+
     const itemLowerCase = item.toLowerCase();
-    const docRef = doc(collection(firestore, "pantry"), itemLowerCase);
+    const userPantryRef = collection(firestore, `users/${userId}/pantry`);
+    const docRef = doc(userPantryRef, itemLowerCase);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const { count } = docSnap.data();
@@ -160,24 +230,21 @@ export default function Home() {
         await setDoc(docRef, { count: count - qty });
       }
     }
-    await updatePantry();
+    await updatePantry(userId);
+    enqueueSnackbar(`Success! Removed ${item} x${qty} from the pantry`, {
+      variant: "success",
+    });
   };
 
+  // Other event handlers to pass userId
   const handleAction = () => {
     if (itemName.trim()) {
-      addItem(itemName.trim(), quantity);
+      addItem(user.uid, itemName.trim(), quantity); // Pass userId
       setItemName("");
       setQuantity(1);
       handleClose();
     }
   };
-
-  // const handleRemoveAction = (item) => {
-  //   if (removeQuantity > 0) {
-  //     removeItem(item, removeQuantity);
-  //     setRemoveQuantity(1);
-  //   }
-  // };
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
@@ -200,7 +267,7 @@ export default function Home() {
       clearTimeout(pressTimer);
       setPressTimer(null);
     }
-    setHoldingItem(null); // Clear holding state
+    setHoldingItem(null);
   };
 
   const openInfoModal = (itemName) => {
@@ -214,13 +281,28 @@ export default function Home() {
 
   const handleInfoAction = (action) => {
     if (action === "add") {
-      addItem(selectedItem, quantity);
+      addItem(user.uid, selectedItem, quantity); // Pass userId
     } else if (action === "remove") {
-      removeItem(selectedItem, quantity);
+      removeItem(user.uid, selectedItem, quantity); // Pass userId
     }
     setQuantity(1);
     setInfoOpen(false);
   };
+
+  const handleFavoriteToggle = async (userId, item) => {
+    if (!userId) return;
+
+    const itemLower = item.toLowerCase();
+    const userPantryRef = collection(firestore, `users/${userId}/pantry`);
+    const docRef = doc(userPantryRef, itemLower);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const { count, favorite } = docSnap.data();
+      await setDoc(docRef, { count, favorite: !favorite });
+    }
+    await updatePantry(userId);
+  };
+
   const glossStyle = {
     background:
       "linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0))",
@@ -232,205 +314,215 @@ export default function Home() {
     document.body.style.backgroundColor = theme.palette.background.default;
   }, [theme.palette.background.default]);
 
+  const StyledToolbar = styled(Toolbar)(({ theme }) => ({
+    alignItems: "flex-start",
+    paddingTop: theme.spacing(1),
+    paddingBottom: theme.spacing(2),
+  }));
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/auth");
+    } catch (error) {
+      console.error("Error signing out: ", error);
+      console.alert(`Error signing out: ${error.message}`);
+    }
+  };
+  const handleNavigateToScanner = () => {
+    router.push('/scanner');
+  };
+
   return (
-    <ColorModeContext.Provider value={colorMode}>
-      <ThemeProvider theme={theme}>
-        <Box
-          width="100vw"
-          height="100vh"
-          display={"flex"}
-          justifyContent={"center"}
-          alignItems={"center"}
-          flexDirection={"column"}
-          gap={2}
-          bgcolor={theme.palette.background.default}
-        >
-          <FormControlLabel
-            control={
-              <Switch
-                checked={mode === "dark"}
-                onChange={colorMode.toggleColorMode}
-              />
-            }
-            label={mode === "light" ? "Light Mode" : "Dark Mode"}
-            labelPlacement="start"
-            sx={{ color: theme.palette.text.primary }}
-          />
-          <Modal
-            open={open}
-            onClose={handleClose}
-            aria-labelledby="modal-modal-title"
-            aria-describedby="modal-modal-description"
-          >
-            <Box sx={style}>
-              <Typography
-                id="modal-modal-title"
-                variant="h6"
-                component="h2"
-                color={theme.palette.text.tertiary}
-              >
-                Add Item
-              </Typography>
-              <Stack width="100%" direction={"row"} spacing={2}>
-                <TextField
-                  id="standard-basic"
-                  label="Item"
-                  variant="standard"
-                  fullWidth
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  onKeyDown={handleKeyDown}
+    <ThemeProvider theme={theme}>
+      <ColorModeContext.Provider value={colorMode}>
+        {/* <SnackbarProvider maxSnack={3}> */}
+        <AppBar position="static">
+          <StyledToolbar>
+            <IconButton edge="start" color="inherit" aria-label="menu">
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+              Welcome {user ? user.displayName : ""}
+            </Typography>
+            <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Welcome to the Barcode Scanner App
+      </Typography>
+      <Button variant="contained" color="primary" onClick={handleNavigateToScanner}>
+        Scan a Barcode
+      </Button>
+    </Box>
+            <Box sx={{ flexGrow: 1 }} />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mode === "dark"}
+                  onChange={colorMode.toggleColorMode}
                 />
-                <TextField
-                  id="standard-basic"
-                  label="Quantity"
-                  variant="standard"
-                  type="number"
-                  fullWidth
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  onKeyDown={handleKeyDown}
-                />
-                <Button variant="outlined" onClick={handleAction}>
-                  Add
-                </Button>
-              </Stack>
-            </Box>
-          </Modal>
-          <Modal
-            open={infoOpen}
-            onClose={handleInfoClose}
-            aria-labelledby="item-info-modal-title"
-            aria-describedby="item-info-modal-description"
-          >
-            <Box sx={style}>
-              <Typography
-                id="item-info-modal-title"
-                variant="h6"
-                component="h2"
-                color={theme.palette.text.tertiary}
-              >
-                Item Info -{" "}
-                {selectedItem.charAt(0).toUpperCase() + selectedItem.slice(1)}
-              </Typography>
-              <Stack width="100%" direction={"row"} spacing={2}>
-                <TextField
-                  id="info-quantity"
-                  label="Quantity"
-                  variant="standard"
-                  type="number"
-                  fullWidth
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                />
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="contained"
-                    onClick={() => handleInfoAction("add")}
-                  >
-                    Add
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => handleInfoAction("remove")}
-                  >
-                    Remove
-                  </Button>
-                </Stack>
-              </Stack>
-            </Box>
-          </Modal>
-
-          <Button
-            variant="contained"
-            onClick={handleOpen}
-            sx={{
-              position: "fixed", // Keeps the button in a fixed position
-              bottom: 36, // Distance from the bottom of the screen
-              right: 40, // Distance from the right of the screen
-              borderRadius: "50%", // Makes the button round
-              width: 56, // Set a fixed width
-              height: 56, // Set a fixed height
-              minWidth: 0, // Removes default width
-              padding: 0, // Removes default padding
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "none", // Optional: remove default shadow
-              aspectRatio: "1 / 1", // Ensures the button stays round
-            }}
-          >
-            <FontAwesomeIcon
-              icon={faPlus}
-              style={{ fontSize: "24px", color: "white" }} // Adjust the icon size and color
+              }
+              label={mode === "light" ? "Light Mode" : "Dark Mode"}
+              labelPlacement="start"
+              sx={{ color: theme.palette.text.primary }}
             />
-          </Button>
-
-          <Box border={`1px solid ${theme.palette.divider}`}>
-            <Box
-              width="800px"
-              height="150px"
-              bgcolor={theme.palette.primary.main}
-              display={"flex"}
-              justifyContent={"center"}
-              alignItems={"center"}
-              flexDirection="column"
+            <IconButton color="inherit">
+              <SearchIcon />
+            </IconButton>
+            <IconButton color="inherit" onClick={handleLogout}>
+              <MoreIcon />
+            </IconButton>
+          </StyledToolbar>
+        </AppBar>
+        <Box sx={{ p: 3 }}>
+          <Stack spacing={2}>
+            <Button
+              variant="contained"
+              onClick={handleOpen}
+              sx={{
+                position: "fixed",
+                bottom: 36,
+                right: 40,
+                borderRadius: "50%",
+                width: 56,
+                height: 56,
+                minWidth: 0,
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "none",
+                aspectRatio: "1 / 1",
+                zIndex: 1200,
+              }}
             >
-              <Typography
-                variant={"h2"}
-                color={theme.palette.text.primary}
-                textAlign={"center"}
-              >
-                Pantry Items
-              </Typography>
-              <TextField
-                id="filter"
-                label="Filter Items"
-                variant="standard"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                sx={{ marginBottom: 2 }} // Add margin for spacing
+              <FontAwesomeIcon
+                icon={faPlus}
+                style={{ fontSize: "24px", color: "white" }}
               />
-            </Box>
-            <Stack width="800px" height="300px" overflow={"auto"}>
-              {filteredPantry.map(({ name, count }) => (
+            </Button>
+
+            <TextField
+              id="filter"
+              label="Filter Items"
+              variant="standard"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              sx={{ marginBottom: 2 }}
+            />
+            <Stack spacing={2}>
+              {filteredPantry.map((item) => (
                 <Box
-                  key={name}
-                  width="100%"
-                  minHeight="100px"
-                  bgcolor={theme.palette.background.paper}
-                  display={"flex"}
-                  justifyContent={"space-between"}
-                  alignItems={"center"}
-                  paddingX={5}
-                  onMouseDown={() => handleMouseDown(name)} // Start timer on mouse down
-                  onMouseUp={handleMouseUp} // Clear timer on mouse up
-                  sx={{
-                    ...(holdingItem === name && glossStyle), // Apply gloss style if holding
-                  }}
+                key={item.name}
+                width="100%"
+                minHeight="100px"
+                paddingX={5}
+                bgcolor={theme.palette.background.paper}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderRadius: "4px",
+                  boxShadow: 1,
+                  cursor: "pointer",
+                  ...(holdingItem === item.name && glossStyle), // Apply gradient only when holding item
+                }}
+                onMouseDown={() => handleMouseDown(item.name)}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp} // Ensure gradient is removed when mouse leaves item
+                onClick={() => handleFavoriteToggle(item.name)}
+              >
+                <Typography
+                  variant={"h3"}
+                  color={theme.palette.text.primary}
+                  textAlign={"left"}
+                  fontSize="24px"
+                  flex="1"
                 >
-                  <Typography
-                    variant={"h3"}
-                    color={theme.palette.text.primary}
-                    textAlign={"center"}
-                    fontSize="24px"
-                  >
-                    {name.charAt(0).toUpperCase() + name.slice(1)}
-                  </Typography>
-                  <Typography
-                    variant={"h3"}
-                    fontSize="24px"
-                    color={theme.palette.text.primary}
-                    textAlign={"center"}
-                  >
-                    qty: {count}
-                  </Typography>
-                </Box>
+                  {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                </Typography>
+                <Typography
+                  variant={"h3"}
+                  fontSize="24px"
+                  color={theme.palette.text.primary}
+                  textAlign={"center"}
+                  flex=".1"
+                >
+                  {item.count}
+                </Typography>
+                <IconButton onClick={() => handleFavoriteToggle(item.name)}>
+                  <FontAwesomeIcon
+                    icon={item.favorite ? faStarSolid : faStarOutline}
+                    style={{ cursor: "pointer", color: item.favorite ? "#FFD700" : "#CCCCCC", fontSize: "24px" }}
+                  />
+                </IconButton>
+              </Box>
+              
               ))}
             </Stack>
-          </Box>
+          </Stack>
         </Box>
-      </ThemeProvider>
-    </ColorModeContext.Provider>
+
+        <Modal open={open} onClose={handleClose} >
+
+          <Box sx={style} >
+            <Typography variant="h6">Add Item</Typography>
+            <TextField
+              label="Item Name"
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              fullWidth
+            />
+            <TextField
+              label="Quantity"
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              fullWidth
+            />
+            <Button variant="contained" onClick={handleAction}>
+              Add
+            </Button>
+          </Box>
+        </Modal>
+
+        <Modal open={infoOpen} onClose={handleInfoClose} >
+          <Box sx={style} >
+            <Typography variant="h6">Manage Item</Typography>
+            <Typography>Item: {selectedItem}</Typography>
+            <TextField
+              label="Quantity"
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              fullWidth
+            />
+            <Button variant="contained" onClick={() => handleInfoAction("add")}>
+              Add Quantity
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => handleInfoAction("remove")}
+              // bgcolor= theme.palette.text.primary,
+              sx={{bgcolor: theme.palette.text.tertiary,}}
+            >
+              Remove Quantity
+            </Button>
+          </Box>
+        </Modal>
+        {/* </SnackbarProvider> */}
+      </ColorModeContext.Provider>
+    </ThemeProvider>
   );
 }
+
+function App() {
+  return (
+    <SnackbarProvider maxSnack={3}>
+      <Home />
+    </SnackbarProvider>
+  );
+}
+
+export default App;
