@@ -3,14 +3,10 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { Button, TextField, Box, Typography } from "@mui/material";
-import firebaseConfig from "@/firebaseConfig"; // Import the configuration
-import { initializeApp } from "firebase/app";
+import { auth } from "@/firebase";
 
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 const Auth = () => {

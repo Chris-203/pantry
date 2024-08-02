@@ -17,6 +17,7 @@
     "@mui/icons-material": "^5.16.6",
     "@mui/material": "^5.16.6",
     "@zxing/library": "^0.21.2",
+    "dotenv": "^16.4.5",
     "firebase": "^10.12.4",
     "firebaseui": "^6.1.0",
     "jsbarcode": "^3.11.6",

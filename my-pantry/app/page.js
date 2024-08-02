@@ -14,7 +14,7 @@ import {
   AppBar,
   Toolbar,
 } from "@mui/material";
-import { firestore } from "@/firebase";
+// import { firestore } from "@/firebase";
 import {
   collection,
   query,
@@ -38,12 +38,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
 import MoreIcon from "@mui/icons-material/MoreVert";
 import { useRouter } from "next/navigation";
-import { getAuth, signOut } from "firebase/auth";
-import firebaseConfig from "@/firebaseConfig";
-import { initializeApp } from "firebase/app";
+import { signOut } from "firebase/auth";
+import { firestore, auth } from "@/firebase";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
 const getDesignTokens = (mode) => ({
   palette: {

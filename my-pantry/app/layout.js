@@ -5,15 +5,13 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { initializeApp } from "firebase/app";
-import firebaseConfig from "@/firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/firebase";
+
 
 const inter = Inter({ subsets: ["latin"] });
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
 
 
 
