@@ -20,9 +20,9 @@ export default function RootLayout({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user || router.pathname !== "/auth") {
+      if (!user || router.pathname !== "/") {
         // Redirect to sign-in page if not authenticated and not already on auth page
-        router.push("/auth");
+        router.push("/");
       }
     });
 
