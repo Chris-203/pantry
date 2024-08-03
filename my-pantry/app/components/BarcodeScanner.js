@@ -18,7 +18,7 @@ const CameraCapture = ({ onCapture }) => {
   const toggleCamera = () => {
     setIsFrontCamera(prevState => !prevState);
     if (cameraRef.current) {
-      cameraRef.current.setCameraPosition(isFrontCamera ? 'back' : 'front');
+      cameraRef.current.switchCamera(); // Check if the method exists for switching cameras
     }
   };
 
@@ -27,7 +27,7 @@ const CameraCapture = ({ onCapture }) => {
       <Camera
         ref={cameraRef}
         style={{ width: '100%', height: '100%' }}
-        facingMode={isFrontCamera ? 'user' : 'environment'}
+        facingMode={isFrontCamera ? 'user' : 'environment'} // Make sure this prop is supported
       />
       <div style={{ position: 'absolute', bottom: 0, width: '100%', padding: '10px', boxSizing: 'border-box' }}>
         <button onClick={captureImage}>Capture Image</button>
