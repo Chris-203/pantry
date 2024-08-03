@@ -13,6 +13,12 @@ import {
   IconButton,
   AppBar,
   Toolbar,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import {
   collection,
@@ -35,11 +41,11 @@ import {
 import { SnackbarProvider, useSnackbar } from "notistack";
 import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
-// import MoreIcon from "@mui/icons-material/MoreVert";
+import { faCamera, faCubesStacked } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { firestore, auth } from "@/firebase";
-
+import Footer from "@/app/components/Footer";
 
 const getDesignTokens = (mode) => ({
   palette: {
@@ -53,14 +59,12 @@ const getDesignTokens = (mode) => ({
           background: {
             default: "#ffffff", //Background color
             paper: "#2871a3", //Item background color
-            
-            
           },
           text: {
-            primary: "#ffffff",
+            primary: "#000000",
             secondary: grey[800],
             tertiary: "#b71c1c",
-            quaternary: "#1b5e20", //Modal background color
+            quaternary: "#ffffff", //Modal background color
           },
         }
       : {
@@ -74,9 +78,9 @@ const getDesignTokens = (mode) => ({
           },
           text: {
             primary: grey[900],
-            secondary: "#ffffff",
+            secondary: "#000000",
             tertiary: "#2871a3",
-            quaternary: "#1b5e20", //Modal background color
+            quaternary: "#ffffff", //Modal background color
           },
         }),
   },
@@ -114,7 +118,7 @@ function Home() {
   const [filteredPantry, setFilteredPantry] = useState([]);
   const [filter, setFilter] = useState("");
   const [user, setUser] = useState(null);
-
+  const [openM, setOpenM] = useState(false);
   const [open, setOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState("");
@@ -176,7 +180,6 @@ function Home() {
     setFilteredPantry(filtered);
   }, [filter, pantry]);
 
-  // Updated useEffect to fetch pantry for the current user
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
@@ -232,10 +235,9 @@ function Home() {
     });
   };
 
-  // Other event handlers to pass userId
   const handleAction = () => {
     if (itemName.trim()) {
-      addItem(user.uid, itemName.trim(), quantity); // Pass userId
+      addItem(user.uid, itemName.trim(), quantity);
       setItemName("");
       setQuantity(1);
       handleClose();
@@ -250,10 +252,10 @@ function Home() {
   };
 
   const handleMouseDown = (itemName) => {
-    setHoldingItem(itemName); // Set holding state
+    setHoldingItem(itemName);
     const timer = setTimeout(() => {
       openInfoModal(itemName);
-    }, 500); // Adjust the duration as needed
+    }, 500);
 
     setPressTimer(timer);
   };
@@ -277,26 +279,44 @@ function Home() {
 
   const handleInfoAction = (action) => {
     if (action === "add") {
-      addItem(user.uid, selectedItem, quantity); // Pass userId
+      addItem(user.uid, selectedItem, quantity);
     } else if (action === "remove") {
-      removeItem(user.uid, selectedItem, quantity); // Pass userId
+      removeItem(user.uid, selectedItem, quantity);
     }
     setQuantity(1);
     setInfoOpen(false);
   };
 
-  const handleFavoriteToggle = async (userId, item) => {
-    if (!userId) return;
-
-    const itemLower = item.toLowerCase();
-    const userPantryRef = collection(firestore, `users/${userId}/pantry`);
-    const docRef = doc(userPantryRef, itemLower);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const { count, favorite } = docSnap.data();
-      await setDoc(docRef, { count, favorite: !favorite });
+  const handleFavoriteToggle = async (userId, itemName) => {
+    if (!userId || !itemName) {
+      console.error("User ID or item name is missing");
+      return;
     }
-    await updatePantry(userId);
+
+    try {
+      const itemLowerCase = itemName.toLowerCase();
+      const userPantryRef = collection(firestore, `users/${userId}/pantry`);
+      const docRef = doc(userPantryRef, itemLowerCase);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const currentData = docSnap.data();
+        const currentFavorite = currentData.favorite || false;
+        console.log(
+          `Toggling favorite status for ${itemName} to ${!currentFavorite}`
+        );
+        await setDoc(
+          docRef,
+          { ...currentData, favorite: !currentFavorite },
+          { merge: true }
+        );
+        await updatePantry(userId);
+      } else {
+        console.error(`Document for ${itemName} does not exist`);
+      }
+    } catch (error) {
+      console.error("Error toggling favorite status:", error);
+    }
   };
 
   const glossStyle = {
@@ -326,29 +346,76 @@ function Home() {
     }
   };
   const handleNavigateToScanner = () => {
-    router.push('/scanner');
+    router.push("/scanner");
   };
+  const handleNavigateToHome = () => {
+    router.push("/auth");
+  };
+  const toggleDrawer = (newOpen) => () => {
+    setOpenM(newOpen);
+  };
+  const DrawerList = (
+    <Box sx={{ width: 250 }} role="presentation" onClick={toggleDrawer(false)}>
+      <List>
+        {["Home", "Scan"].map((text, index) => (
+          <ListItem key={text} disablePadding>
+            <ListItemButton
+              onClick={
+                text === "Scan"
+                  ? handleNavigateToScanner
+                  : text === "Home"
+                  ? handleNavigateToHome
+                  : undefined
+              }
+            >
+              <ListItemIcon>
+                {index % 2 === 0 ? (
+                  <FontAwesomeIcon icon={faCubesStacked} />
+                ) : (
+                  <FontAwesomeIcon icon={faCamera} />
+                )}
+              </ListItemIcon>
+              <ListItemText primary={text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+    </Box>
+  );
 
   return (
     <ThemeProvider theme={theme}>
       <ColorModeContext.Provider value={colorMode}>
-        {/* <SnackbarProvider maxSnack={3}> */}
         <AppBar position="static">
           <StyledToolbar>
-            <IconButton edge="start" color="inherit" aria-label="menu">
-              <MenuIcon />
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="menu"
+              onClick={toggleDrawer(true)}
+            >
+              <MenuIcon sx={{ color: theme.palette.text.quaternary }} />
             </IconButton>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            <Drawer open={openM} onClose={toggleDrawer(false)}>
+              {DrawerList}
+            </Drawer>
+            <Typography
+              variant="h6"
+              sx={{ flexGrow: 1 }}
+              color="#ffffff"
+              margin="3px"
+            >
               Welcome {user ? user.displayName : ""}
             </Typography>
-            <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Welcome to the Barcode Scanner App
-      </Typography>
-      <Button variant="contained" color="primary" onClick={handleNavigateToScanner}>
-        Scan a Barcode
-      </Button>
-    </Box>
+            <img
+              src="/images/logo.png"
+              alt="Logo"
+              style={{
+                maxWidth: "8%",
+                height: "auto",
+                maxHeight: "30vh",
+              }}
+            />
             <Box sx={{ flexGrow: 1 }} />
             <FormControlLabel
               control={
@@ -359,12 +426,19 @@ function Home() {
               }
               label={mode === "light" ? "Light Mode" : "Dark Mode"}
               labelPlacement="start"
-              sx={{ color: theme.palette.text.primary }}
+              sx={{ color: theme.palette.text.quaternary }}
             />
-            <IconButton color="inherit">
+            <IconButton
+              color="inherit"
+              sx={{ color: theme.palette.text.quaternary }}
+            >
               <SearchIcon />
             </IconButton>
-            <Button color="inherit" onClick={handleLogout}>
+            <Button
+              color="inherit"
+              onClick={handleLogout}
+              sx={{ color: theme.palette.text.quaternary, margin: 0.2 }}
+            >
               Log Out
             </Button>
           </StyledToolbar>
@@ -408,59 +482,63 @@ function Home() {
             <Stack spacing={2}>
               {filteredPantry.map((item) => (
                 <Box
-                key={item.name}
-                width="100%"
-                minHeight="100px"
-                paddingX={5}
-                bgcolor={theme.palette.background.paper}
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderRadius: "4px",
-                  boxShadow: 1,
-                  cursor: "pointer",
-                  ...(holdingItem === item.name && glossStyle), // Apply gradient only when holding item
-                }}
-                onMouseDown={() => handleMouseDown(item.name)}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp} // Ensure gradient is removed when mouse leaves item
-                onClick={() => handleFavoriteToggle(item.name)}
-              >
-                <Typography
-                  variant={"h3"}
-                  color={theme.palette.text.primary}
-                  textAlign={"left"}
-                  fontSize="24px"
-                  flex="1"
+                  key={item.name}
+                  width="100%"
+                  minHeight="100px"
+                  paddingX={5}
+                  bgcolor={theme.palette.background.paper}
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderRadius: "4px",
+                    boxShadow: 1,
+                    cursor: "pointer",
+                    ...(holdingItem === item.name && glossStyle), // Apply gradient only when holding item
+                  }}
+                  onMouseDown={() => handleMouseDown(item.name)}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp} // Ensure gradient is removed when mouse leaves item
+                  onClick={() => handleFavoriteToggle(item.name)}
                 >
-                  {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-                </Typography>
-                <Typography
-                  variant={"h3"}
-                  fontSize="24px"
-                  color={theme.palette.text.primary}
-                  textAlign={"center"}
-                  flex=".1"
-                >
-                  {item.count}
-                </Typography>
-                <IconButton onClick={() => handleFavoriteToggle(item.name)}>
-                  <FontAwesomeIcon
-                    icon={item.favorite ? faStarSolid : faStarOutline}
-                    style={{ cursor: "pointer", color: item.favorite ? "#FFD700" : "#CCCCCC", fontSize: "24px" }}
-                  />
-                </IconButton>
-              </Box>
-              
+                  <Typography
+                    variant={"h3"}
+                    color={theme.palette.text.quaternary}
+                    textAlign={"left"}
+                    fontSize="24px"
+                    flex="1"
+                  >
+                    {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                  </Typography>
+                  <Typography
+                    variant={"h3"}
+                    fontSize="24px"
+                    color={theme.palette.text.quaternary}
+                    textAlign={"center"}
+                    flex=".1"
+                  >
+                    {item.count}
+                  </Typography>
+                  <IconButton
+                    onClick={() => handleFavoriteToggle(user.uid, item.name)}
+                  >
+                    <FontAwesomeIcon
+                      icon={item.favorite ? faStarSolid : faStarOutline}
+                      style={{
+                        cursor: "pointer",
+                        color: item.favorite ? "#FFD700" : "#CCCCCC",
+                        fontSize: "24px",
+                      }}
+                    />
+                  </IconButton>
+                </Box>
               ))}
             </Stack>
           </Stack>
         </Box>
 
-        <Modal open={open} onClose={handleClose} >
-
-          <Box sx={style} >
+        <Modal open={open} onClose={handleClose}>
+          <Box sx={style}>
             <Typography variant="h6">Add Item</Typography>
             <TextField
               label="Item Name"
@@ -482,8 +560,8 @@ function Home() {
           </Box>
         </Modal>
 
-        <Modal open={infoOpen} onClose={handleInfoClose} >
-          <Box sx={style} >
+        <Modal open={infoOpen} onClose={handleInfoClose}>
+          <Box sx={style}>
             <Typography variant="h6">Manage Item</Typography>
             <Typography>Item: {selectedItem}</Typography>
             <TextField
@@ -501,13 +579,12 @@ function Home() {
               color="error"
               onClick={() => handleInfoAction("remove")}
               // bgcolor= theme.palette.text.primary,
-              sx={{bgcolor: theme.palette.text.tertiary,}}
+              sx={{ bgcolor: theme.palette.text.tertiary }}
             >
               Remove Quantity
             </Button>
           </Box>
         </Modal>
-        {/* </SnackbarProvider> */}
       </ColorModeContext.Provider>
     </ThemeProvider>
   );
@@ -517,6 +594,7 @@ function App() {
   return (
     <SnackbarProvider maxSnack={3}>
       <Home />
+      <Footer />
     </SnackbarProvider>
   );
 }
