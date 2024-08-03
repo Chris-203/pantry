@@ -6,24 +6,26 @@ const BarcodeDecoder = ({ imageSrc, onDecode }) => {
   useEffect(() => {
     const decodeBarcode = async () => {
       if (imageSrc) {
+        console.log('Decoding Image Source:', imageSrc); // Log image source being decoded
         const reader = new BrowserMultiFormatReader();
-        const image = new Image(); // Create an image element
+        const image = new Image();
         image.src = imageSrc;
 
-        // Ensure the image is loaded before decoding
         image.onload = async () => {
           try {
+            console.log('Image loaded, starting decoding'); // Log when image is loaded
             const result = await reader.decodeFromImage(image);
+            console.log('Decode Result:', result.text); // Log the result of decoding
             onDecode(result.text);
           } catch (error) {
             console.error('Error decoding barcode:', error);
-            onDecode(null); // Notify that decoding failed
+            onDecode(null);
           }
         };
 
         image.onerror = () => {
           console.error('Error loading image for decoding');
-          onDecode(null); // Notify that decoding failed
+          onDecode(null);
         };
       }
     };
