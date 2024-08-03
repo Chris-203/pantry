@@ -20,6 +20,9 @@ const CameraCapture = () => {
 
   const toggleCamera = () => {
     setIsFrontCamera(prevState => !prevState);
+    if (cameraRef.current) {
+      cameraRef.current.switchCamera(); // Check if the method exists for switching cameras
+    }
   };
 
   const handleDecode = async (text) => {
@@ -29,7 +32,7 @@ const CameraCapture = () => {
     if (text) {
       // Fetch product information
       try {
-        const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${text}.json`);
+        const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${text}`);
         const data = await response.json();
         if (data.product) {
           console.log('Product Data:', data.product); // Log product data
