@@ -1,3 +1,4 @@
+// BarcodeDecoder.js
 import { useEffect } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import PropTypes from 'prop-types';

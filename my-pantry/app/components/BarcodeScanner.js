@@ -8,6 +8,7 @@ const CameraCapture = () => {
   const [capturedImage, setCapturedImage] = useState(null);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [decodedText, setDecodedText] = useState(null);
+  const [productInfo, setProductInfo] = useState(null);
 
   const captureImage = async () => {
     if (cameraRef.current) {
@@ -21,9 +22,27 @@ const CameraCapture = () => {
     setIsFrontCamera(prevState => !prevState);
   };
 
-  const handleDecode = (text) => {
+  const handleDecode = async (text) => {
     console.log('Decoded Text:', text); // Log decoded text
     setDecodedText(text);
+    
+    if (text) {
+      // Fetch product information
+      try {
+        const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${text}.json`);
+        const data = await response.json();
+        if (data.product) {
+          console.log('Product Data:', data.product); // Log product data
+          setProductInfo(data.product);
+        } else {
+          console.error('Product not found');
+          setProductInfo(null);
+        }
+      } catch (error) {
+        console.error('Error fetching product data:', error);
+        setProductInfo(null);
+      }
+    }
   };
 
   return (
@@ -46,6 +65,15 @@ const CameraCapture = () => {
           </div>
         )}
         {decodedText && <p>Decoded Text: {decodedText}</p>}
+        {productInfo && (
+          <div>
+            <h3>Product Information:</h3>
+            <p>Name: {productInfo.product_name || 'N/A'}</p>
+            <p>Brand: {productInfo.brands || 'N/A'}</p>
+            <p>Ingredients: {productInfo.ingredients_text || 'N/A'}</p>
+            {/* Add more fields as needed */}
+          </div>
+        )}
       </div>
     </div>
   );
