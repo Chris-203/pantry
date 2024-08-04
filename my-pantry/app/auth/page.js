@@ -40,7 +40,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { SnackbarProvider, useSnackbar } from "notistack";
 import MenuIcon from "@mui/icons-material/Menu";
-import SearchIcon from "@mui/icons-material/Search";
 import { faCamera, faCubesStacked } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
@@ -65,6 +64,7 @@ const getDesignTokens = (mode) => ({
             secondary: grey[800],
             tertiary: "#b71c1c",
             quaternary: "#ffffff", //Modal background color
+            quinary: "#ffffff"
           },
         }
       : {
@@ -73,14 +73,16 @@ const getDesignTokens = (mode) => ({
           },
           divider: blue,
           background: {
-            default: "Darkgrey", //Background color
+            default: grey[800], //Background color
             paper: "#800000", //Item background color
           },
           text: {
-            primary: grey[900],
-            secondary: "#000000",
+            primary: "#ffffff",
+            secondary: "#ffffff",
             tertiary: "#2871a3",
             quaternary: "#ffffff", //Modal background color
+            //after quaternary, add a new color for the text color of the footer
+            quinary: grey[800],
           },
         }),
   },
@@ -92,7 +94,7 @@ const style = {
   left: "50%",
   transform: "translate(-50%, -50%)",
   width: 400,
-  bgcolor: "text.quaternary",
+  bgcolor: "text.quinary",
   boxShadow: 24,
   p: 4,
   display: "flex",
@@ -428,12 +430,6 @@ function Home() {
               labelPlacement="start"
               sx={{ color: theme.palette.text.quaternary }}
             />
-            <IconButton
-              color="inherit"
-              sx={{ color: theme.palette.text.quaternary }}
-            >
-              <SearchIcon />
-            </IconButton>
             <Button
               color="inherit"
               onClick={handleLogout}
@@ -539,7 +535,7 @@ function Home() {
 
         <Modal open={open} onClose={handleClose}>
           <Box sx={style}>
-            <Typography variant="h6">Add Item</Typography>
+            <Typography variant="h6" color={theme.palette.text.primary}>Add Item</Typography>
             <TextField
               label="Item Name"
               value={itemName}
@@ -551,6 +547,11 @@ function Home() {
               label="Quantity"
               type="number"
               value={quantity}
+              sx={{ 
+                "& .MuiInputBase-input": {
+                  color: (theme) => theme.palette.text.primary,
+                }
+              }}
               onChange={(e) => setQuantity(Number(e.target.value))}
               fullWidth
             />
@@ -562,12 +563,17 @@ function Home() {
 
         <Modal open={infoOpen} onClose={handleInfoClose}>
           <Box sx={style}>
-            <Typography variant="h6">Manage Item</Typography>
-            <Typography>Item: {selectedItem}</Typography>
+            <Typography variant="h6" color={theme.palette.text.primary}>Manage Item</Typography>
+            <Typography color={theme.palette.text.primary}>Item: {selectedItem}</Typography>
             <TextField
               label="Quantity"
               type="number"
               value={quantity}
+              sx={{ 
+                "& .MuiInputBase-input": {
+                  color: (theme) => theme.palette.text.primary,
+                }
+              }}
               onChange={(e) => setQuantity(Number(e.target.value))}
               fullWidth
             />
